@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkShort - URL Shortener with Analytics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card h2 {
+            margin-bottom: 20px;
+            color: #4a5568;
+            font-size: 1.5em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 12px;
+            display: none;
+        }
+
+        .result.success {
+            background: #f0fff4;
+            border: 1px solid #9ae6b4;
+            color: #22543d;
+        }
+
+        .result.error {
+            background: #fed7d7;
+            border: 1px solid #fc8181;
+            color: #742a2a;
+        }
+
+        .short-link {
+            background: #edf2f7;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            word-break: break-all;
+            font-family: monospace;
+        }
+
+        .links-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .links-table th,
+        .links-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .links-table th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .links-table tr:hover {
+            background: #f7fafc;
+        }
+
+        .delete-btn {
+            background: #e53e3e;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .delete-btn:hover {
+            background: #c53030;
+        }
+
+        .analytics-section {
+            grid-column: 1 / -1;
+        }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .analytics-card {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .analytics-card h3 {
+            color: #4a5568;
+            margin-bottom: 10px;
+        }
+
+        .analytics-card .number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .click-log {
+            background: #f7fafc;
+            padding: 15px;
+            border-radius: 12px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .click-entry {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .copy-btn {
+            background: #38a169;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .copy-btn:hover {
+            background: #2f855a;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔗 LinkShort</h1>
+            <p>Shorten URLs and track clicks with detailed analytics</p>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>Create Short Link</h2>
+                <form id="urlForm">
+                    <div class="form-group">
+                        <label for="originalUrl">Original URL</label>
+                        <input type="url" id="originalUrl" placeholder="https://example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="customCode">Custom Code (optional)</label>
+                        <input type="text" id="customCode" placeholder="my-link" pattern="[a-zA-Z0-9-_]+" title="Only letters, numbers, hyphens and underscores allowed">
+                    </div>
+                    <button type="submit" class="btn">Shorten URL</button>
+                </form>
+                <div id="result" class="result"></div>
+            </div>
+
+            <div class="card">
+                <h2>Your Links</h2>
+                <div id="linksContainer">
+                    <p>No links created yet. Create your first short link!</p>
+                </div>
+            </div>
+
+            <div class="card analytics-section">
+                <h2>Analytics Dashboard</h2>
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <h3>Total Links</h3>
+                        <div class="number" id="totalLinks">0</div>
+                    </div>
+                    <div class="analytics-card">
+                        <h3>Total Clicks</h3>
+                        <div class="number" id="totalClicks">0</div>
+                    </div>
+                    <div class="analytics-card">
+                        <h3>Unique Visitors</h3>
+                        <div class="number" id="uniqueVisitors">0</div>
+                    </div>
+                    <div class="analytics-card">
+                        <h3>Today's Clicks</h3>
+                        <div class="number" id="todayClicks">0</div>
+                    </div>
+                </div>
+                
+                <div class="click-log">
+                    <h3>Recent Clicks</h3>
+                    <div id="clickLog">
+                        <p>No clicks recorded yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class LinkShortener {
+            constructor() {
+                this.links = this.loadFromStorage('links') || {};
+                this.clicks = this.loadFromStorage('clicks') || [];
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.renderLinks();
+                this.updateAnalytics();
+                this.handleRedirect();
+            }
+
+            bindEvents() {
+                document.getElementById('urlForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.createShortLink();
+                });
+            }
+
+            createShortLink() {
+                const originalUrl = document.getElementById('originalUrl').value;
+                const customCode = document.getElementById('customCode').value;
+                const resultDiv = document.getElementById('result');
+
+                if (!this.isValidUrl(originalUrl)) {
+                    this.showResult('Please enter a valid URL', 'error');
+                    return;
+                }
+
+                const shortCode = customCode || this.generateShortCode();
+
+                if (this.links[shortCode]) {
+                    this.showResult('This custom code is already taken. Please choose another.', 'error');
+                    return;
+                }
+
+                this.links[shortCode] = {
+                    originalUrl: originalUrl,
+                    shortCode: shortCode,
+                    created: new Date().toISOString(),
+                    clicks: 0
+                };
+
+                this.saveToStorage('links', this.links);
+                
+                const shortUrl = `${window.location.origin}${window.location.pathname}?r=${shortCode}`;
+                this.showResult(`Link created successfully!`, 'success', shortUrl);
+                
+                document.getElementById('urlForm').reset();
+                this.renderLinks();
+                this.updateAnalytics();
+            }
+
+            generateShortCode() {
+                const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                let result = '';
+                for (let i = 0; i < 6; i++) {
+                    result += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return this.links[result] ? this.generateShortCode() : result;
+            }
+
+            isValidUrl(string) {
+                try {
+                    new URL(string);
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            }
+
+            showResult(message, type, shortUrl = null) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.className = `result ${type}`;
+                resultDiv.style.display = 'block';
+                
+                let content = `<strong>${message}</strong>`;
+                if (shortUrl) {
+                    content += `<div class="short-link">${shortUrl} <button class="copy-btn" onclick="app.copyToClipboard('${shortUrl}')">Copy</button></div>`;
+                }
+                
+                resultDiv.innerHTML = content;
+                
+                setTimeout(() => {
+                    resultDiv.style.display = 'none';
+                }, 5000);
+            }
+
+            copyToClipboard(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Link copied to clipboard!');
+                });
+            }
+
+            renderLinks() {
+                const container = document.getElementById('linksContainer');
+                const links = Object.values(this.links);
+
+                if (links.length === 0) {
+                    container.innerHTML = '<p>No links created yet. Create your first short link!</p>';
+                    return;
+                }
+
+                const table = `
+                    <table class="links-table">
+                        <thead>
+                            <tr>
+                                <th>Short Link</th>
+                                <th>Original URL</th>
+                                <th>Clicks</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${links.map(link => `
+                                <tr>
+                                    <td>
+                                        <code>${link.shortCode}</code>
+                                        <button class="copy-btn" onclick="app.copyToClipboard('${window.location.origin}${window.location.pathname}?r=${link.shortCode}')">Copy</button>
+                                    </td>
+                                    <td title="${link.originalUrl}">${this.truncateUrl(link.originalUrl)}</td>
+                                    <td>${link.clicks}</td>
+                                    <td>${new Date(link.created).toLocaleDateString()}</td>
+                                    <td>
+                                        <button class="delete-btn" onclick="app.deleteLink('${link.shortCode}')">Delete</button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                container.innerHTML = table;
+            }
+
+            truncateUrl(url) {
+                return url.length > 40 ? url.substring(0, 40) + '...' : url;
+            }
+
+            deleteLink(shortCode) {
+                if (confirm('Are you sure you want to delete this link?')) {
+                    delete this.links[shortCode];
+                    this.saveToStorage('links', this.links);
+                    this.renderLinks();
+                    this.updateAnalytics();
+                }
+            }
+
+            handleRedirect() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectCode = urlParams.get('r');
+
+                if (redirectCode && this.links[redirectCode]) {
+                    this.recordClick(redirectCode);
+                    window.location.href = this.links[redirectCode].originalUrl;
+                }
+            }
+
+            async recordClick(shortCode) {
+                if (!this.links[shortCode]) return;
+
+                // Get user's location data
+                const locationData = await this.getLocationData();
+                
+                const clickData = {
+                    shortCode: shortCode,
+                    timestamp: new Date().toISOString(),
+                    userAgent: navigator.userAgent,
+                    referrer: document.referrer,
+                    ip: 'N/A', // Can't get real IP in client-side JS
+                    ...locationData
+                };
+
+                this.clicks.push(clickData);
+                this.links[shortCode].clicks++;
+                
+                this.saveToStorage('clicks', this.clicks);
+                this.saveToStorage('links', this.links);
+            }
+
+            async getLocationData() {
+                try {
+                    // Try to get user's location
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            timeout: 5000,
+                            enableHighAccuracy: false
+                        });
+                    });
+
+                    return {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        locationMethod: 'GPS'
+                    };
+                } catch (error) {
+                    // Fallback to timezone-based location estimation
+                    return {
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        language: navigator.language,
+                        locationMethod: 'Timezone/Language'
+                    };
+                }
+            }
+
+            updateAnalytics() {
+                const links = Object.values(this.links);
+                const totalClicks = links.reduce((sum, link) => sum + link.clicks, 0);
+                const today = new Date().toDateString();
+                const todayClicks = this.clicks.filter(click => 
+                    new Date(click.timestamp).toDateString() === today
+                ).length;
+                
+                // Get unique visitors (simplified - based on user agent + day)
+                const uniqueVisitors = new Set(
+                    this.clicks.map(click => 
+                        click.userAgent + new Date(click.timestamp).toDateString()
+                    )
+                ).size;
+
+                document.getElementById('totalLinks').textContent = links.length;
+                document.getElementById('totalClicks').textContent = totalClicks;
+                document.getElementById('uniqueVisitors').textContent = uniqueVisitors;
+                document.getElementById('todayClicks').textContent = todayClicks;
+
+                this.renderClickLog();
+            }
+
+            renderClickLog() {
+                const clickLog = document.getElementById('clickLog');
+                const recentClicks = this.clicks.slice(-10).reverse();
+
+                if (recentClicks.length === 0) {
+                    clickLog.innerHTML = '<p>No clicks recorded yet.</p>';
+                    return;
+                }
+
+                const clicksHtml = recentClicks.map(click => {
+                    const link = this.links[click.shortCode];
+                    const date = new Date(click.timestamp);
+                    
+                    return `
+                        <div class="click-entry">
+                            <strong>${click.shortCode}</strong> → ${link ? this.truncateUrl(link.originalUrl) : 'Deleted'}
+                            <br>
+                            <small>
+                                📅 ${date.toLocaleString()}
+                                ${click.timezone ? `🌍 ${click.timezone}` : ''}
+                                ${click.latitude ? `📍 ${click.latitude.toFixed(2)}, ${click.longitude.toFixed(2)}` : ''}
+                            </small>
+                        </div>
+                    `;
+                }).join('');
+
+                clickLog.innerHTML = clicksHtml;
+            }
+
+            saveToStorage(key, data) {
+                // Note: Using in-memory storage instead of localStorage for Claude.ai compatibility
+                window[`app_${key}`] = data;
+            }
+
+            loadFromStorage(key) {
+                return window[`app_${key}`] || null;
+            }
+        }
+
+        // Initialize the app
+        const app = new LinkShortener();
+    </script>
+</body>
+</html>
