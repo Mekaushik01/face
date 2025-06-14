@@ -213,7 +213,7 @@
 
         .click-entry {
             background: white;
-            padding: 10px;
+            padding: 15px;
             border-radius: 8px;
             margin-bottom: 10px;
             border-left: 4px solid #667eea;
@@ -232,6 +232,31 @@
 
         .copy-btn:hover {
             background: #2f855a;
+        }
+
+        .redirect-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            text-align: center;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {
@@ -308,17 +333,54 @@
     </div>
 
     <script>
+        // Storage using cookies as fallback since localStorage isn't available
+        const Storage = {
+            set: function(key, value) {
+                const data = JSON.stringify(value);
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (365 * 24 * 60 * 60 * 1000)); // 1 year
+                document.cookie = `linkshort_${key}=${encodeURIComponent(data)};expires=${expires.toUTCString()};path=/`;
+                
+                // Also store in memory for current session
+                window[`app_${key}`] = value;
+            },
+            
+            get: function(key) {
+                // First try memory
+                if (window[`app_${key}`]) {
+                    return window[`app_${key}`];
+                }
+                
+                // Then try cookies
+                const name = `linkshort_${key}=`;
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    cookie = cookie.trim();
+                    if (cookie.indexOf(name) === 0) {
+                        try {
+                            const value = JSON.parse(decodeURIComponent(cookie.substring(name.length)));
+                            window[`app_${key}`] = value; // Cache in memory
+                            return value;
+                        } catch (e) {
+                            console.warn('Failed to parse cookie data:', e);
+                        }
+                    }
+                }
+                return null;
+            }
+        };
+
         class LinkShortener {
             constructor() {
-                this.links = this.loadFromStorage('links') || {};
-                this.clicks = this.loadFromStorage('clicks') || [];
+                this.links = Storage.get('links') || {};
+                this.clicks = Storage.get('clicks') || [];
                 this.init();
             }
 
             init() {
-                // Handle redirect first - if we're redirecting, don't load the dashboard
+                // Check for redirect first
                 if (this.handleRedirect()) {
-                    return; // Stop initialization if we're redirecting
+                    return;
                 }
                 
                 this.bindEvents();
@@ -336,7 +398,6 @@
             createShortLink() {
                 const originalUrl = document.getElementById('originalUrl').value;
                 const customCode = document.getElementById('customCode').value;
-                const resultDiv = document.getElementById('result');
 
                 if (!this.isValidUrl(originalUrl)) {
                     this.showResult('Please enter a valid URL', 'error');
@@ -357,7 +418,7 @@
                     clicks: 0
                 };
 
-                this.saveToStorage('links', this.links);
+                Storage.set('links', this.links);
                 
                 const shortUrl = `${window.location.origin}${window.location.pathname}?r=${shortCode}`;
                 this.showResult(`Link created successfully!`, 'success', shortUrl);
@@ -406,6 +467,166 @@
                 navigator.clipboard.writeText(text).then(() => {
                     alert('Link copied to clipboard!');
                 });
+            }
+
+            handleRedirect() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const redirectCode = urlParams.get('r');
+
+                if (redirectCode) {
+                    if (this.links[redirectCode]) {
+                        // Show redirect screen immediately
+                        document.body.innerHTML = `
+                            <div class="redirect-screen">
+                                <div>
+                                    <h2>🔗 Redirecting...</h2>
+                                    <p>Taking you to: ${this.truncateUrl(this.links[redirectCode].originalUrl)}</p>
+                                    <div style="margin-top: 20px;">
+                                        <div class="spinner"></div>
+                                    </div>
+                                    <p style="margin-top: 20px; font-size: 14px; opacity: 0.8;">
+                                        If redirect doesn't work, <a href="${this.links[redirectCode].originalUrl}" style="color: white; text-decoration: underline;">click here</a>
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Record click and redirect
+                        this.recordClickAndRedirect(redirectCode);
+                        return true;
+                    } else {
+                        // Link not found
+                        document.body.innerHTML = `
+                            <div class="redirect-screen">
+                                <div>
+                                    <h2>❌ Link Not Found</h2>
+                                    <p>The short link "${redirectCode}" doesn't exist or has been deleted.</p>
+                                    <p style="margin-top: 20px;">
+                                        <a href="${window.location.origin}${window.location.pathname}" style="
+                                            color: white;
+                                            text-decoration: none;
+                                            background: rgba(255,255,255,0.2);
+                                            padding: 10px 20px;
+                                            border-radius: 8px;
+                                            display: inline-block;
+                                            margin-top: 10px;
+                                        ">← Back to LinkShort</a>
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            async recordClickAndRedirect(shortCode) {
+                try {
+                    // Get location data
+                    const locationData = await this.getLocationData();
+                    
+                    // Get IP address from external service
+                    const ipData = await this.getIPData();
+                    
+                    const clickData = {
+                        shortCode: shortCode,
+                        timestamp: new Date().toISOString(),
+                        userAgent: navigator.userAgent,
+                        referrer: document.referrer || 'Direct',
+                        language: navigator.language,
+                        platform: navigator.platform,
+                        screen: `${screen.width}x${screen.height}`,
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        ...locationData,
+                        ...ipData
+                    };
+
+                    this.clicks.push(clickData);
+                    this.links[shortCode].clicks++;
+                    
+                    Storage.set('clicks', this.clicks);
+                    Storage.set('links', this.links);
+                    
+                    console.log('Click recorded:', clickData);
+                    
+                } catch (error) {
+                    console.warn('Failed to record click data:', error);
+                }
+                
+                // Redirect after recording (or after timeout)
+                setTimeout(() => {
+                    window.location.replace(this.links[shortCode].originalUrl);
+                }, 1500);
+            }
+
+            async getLocationData() {
+                return new Promise((resolve) => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                resolve({
+                                    latitude: position.coords.latitude.toFixed(6),
+                                    longitude: position.coords.longitude.toFixed(6),
+                                    accuracy: position.coords.accuracy,
+                                    locationMethod: 'GPS'
+                                });
+                            },
+                            (error) => {
+                                console.warn('Geolocation failed:', error.message);
+                                resolve({
+                                    location: 'Permission denied or unavailable',
+                                    locationMethod: 'Failed'
+                                });
+                            },
+                            {
+                                timeout: 5000,
+                                enableHighAccuracy: false
+                            }
+                        );
+                    } else {
+                        resolve({
+                            location: 'Geolocation not supported',
+                            locationMethod: 'Not supported'
+                        });
+                    }
+                });
+            }
+
+            async getIPData() {
+                try {
+                    const response = await fetch('https://api.ipify.org?format=json');
+                    const data = await response.json();
+                    
+                    // Try to get location from IP
+                    try {
+                        const geoResponse = await fetch(`https://ipapi.co/${data.ip}/json/`);
+                        const geoData = await geoResponse.json();
+                        
+                        return {
+                            ip: data.ip,
+                            country: geoData.country_name || 'Unknown',
+                            region: geoData.region || 'Unknown',
+                            city: geoData.city || 'Unknown',
+                            isp: geoData.org || 'Unknown'
+                        };
+                    } catch (geoError) {
+                        return {
+                            ip: data.ip,
+                            country: 'Unknown',
+                            region: 'Unknown',
+                            city: 'Unknown'
+                        };
+                    }
+                } catch (error) {
+                    console.warn('Failed to get IP data:', error);
+                    return {
+                        ip: 'Unable to fetch',
+                        country: 'Unknown',
+                        region: 'Unknown',
+                        city: 'Unknown'
+                    };
+                }
             }
 
             renderLinks() {
@@ -457,102 +678,9 @@
             deleteLink(shortCode) {
                 if (confirm('Are you sure you want to delete this link?')) {
                     delete this.links[shortCode];
-                    this.saveToStorage('links', this.links);
+                    Storage.set('links', this.links);
                     this.renderLinks();
                     this.updateAnalytics();
-                }
-            }
-
-            handleRedirect() {
-                const urlParams = new URLSearchParams(window.location.search);
-                const redirectCode = urlParams.get('r');
-
-                if (redirectCode && this.links[redirectCode]) {
-                    // Record the click first
-                    this.recordClick(redirectCode);
-                    
-                    // Hide the page content and show redirect message
-                    document.body.innerHTML = `
-                        <div style="
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;
-                            min-height: 100vh;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                            color: white;
-                            text-align: center;
-                        ">
-                            <div>
-                                <h2>🔗 Redirecting...</h2>
-                                <p>Taking you to your destination</p>
-                                <div style="margin-top: 20px;">
-                                    <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite;"></div>
-                                </div>
-                            </div>
-                        </div>
-                        <style>
-                            @keyframes spin {
-                                to { transform: rotate(360deg); }
-                            }
-                        </style>
-                    `;
-                    
-                    // Redirect after a short delay to ensure click is recorded
-                    setTimeout(() => {
-                        window.location.href = this.links[redirectCode].originalUrl;
-                    }, 500);
-                    
-                    return true; // Indicate that we're redirecting
-                }
-                return false; // No redirect needed
-            }
-
-            async recordClick(shortCode) {
-                if (!this.links[shortCode]) return;
-
-                // Get user's location data
-                const locationData = await this.getLocationData();
-                
-                const clickData = {
-                    shortCode: shortCode,
-                    timestamp: new Date().toISOString(),
-                    userAgent: navigator.userAgent,
-                    referrer: document.referrer,
-                    ip: 'N/A', // Can't get real IP in client-side JS
-                    ...locationData
-                };
-
-                this.clicks.push(clickData);
-                this.links[shortCode].clicks++;
-                
-                this.saveToStorage('clicks', this.clicks);
-                this.saveToStorage('links', this.links);
-            }
-
-            async getLocationData() {
-                try {
-                    // Try to get user's location
-                    const position = await new Promise((resolve, reject) => {
-                        navigator.geolocation.getCurrentPosition(resolve, reject, {
-                            timeout: 5000,
-                            enableHighAccuracy: false
-                        });
-                    });
-
-                    return {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: position.coords.accuracy,
-                        locationMethod: 'GPS'
-                    };
-                } catch (error) {
-                    // Fallback to timezone-based location estimation
-                    return {
-                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                        language: navigator.language,
-                        locationMethod: 'Timezone/Language'
-                    };
                 }
             }
 
@@ -564,10 +692,9 @@
                     new Date(click.timestamp).toDateString() === today
                 ).length;
                 
-                // Get unique visitors (simplified - based on user agent + day)
                 const uniqueVisitors = new Set(
                     this.clicks.map(click => 
-                        click.userAgent + new Date(click.timestamp).toDateString()
+                        (click.ip || 'unknown') + new Date(click.timestamp).toDateString()
                     )
                 ).size;
 
@@ -594,27 +721,21 @@
                     
                     return `
                         <div class="click-entry">
-                            <strong>${click.shortCode}</strong> → ${link ? this.truncateUrl(link.originalUrl) : 'Deleted'}
-                            <br>
-                            <small>
-                                📅 ${date.toLocaleString()}
-                                ${click.timezone ? `🌍 ${click.timezone}` : ''}
-                                ${click.latitude ? `📍 ${click.latitude.toFixed(2)}, ${click.longitude.toFixed(2)}` : ''}
-                            </small>
+                            <div><strong>🔗 ${click.shortCode}</strong> → ${link ? this.truncateUrl(link.originalUrl) : 'Deleted Link'}</div>
+                            <div style="font-size: 14px; color: #666; margin-top: 8px;">
+                                <div><strong>📅 Time:</strong> ${date.toLocaleString()}</div>
+                                <div><strong>🌐 IP:</strong> ${click.ip || 'Unknown'}</div>
+                                <div><strong>📍 Location:</strong> ${click.city || 'Unknown'}, ${click.region || 'Unknown'}, ${click.country || 'Unknown'}</div>
+                                ${click.latitude ? `<div><strong>🎯 GPS:</strong> ${click.latitude}, ${click.longitude}</div>` : ''}
+                                <div><strong>💻 Device:</strong> ${click.platform || 'Unknown'} - ${click.screen || 'Unknown'}</div>
+                                <div><strong>🔗 Referrer:</strong> ${click.referrer || 'Direct'}</div>
+                                <div><strong>🌍 ISP:</strong> ${click.isp || 'Unknown'}</div>
+                            </div>
                         </div>
                     `;
                 }).join('');
 
                 clickLog.innerHTML = clicksHtml;
-            }
-
-            saveToStorage(key, data) {
-                // Note: Using in-memory storage instead of localStorage for Claude.ai compatibility
-                window[`app_${key}`] = data;
-            }
-
-            loadFromStorage(key) {
-                return window[`app_${key}`] || null;
             }
         }
 
